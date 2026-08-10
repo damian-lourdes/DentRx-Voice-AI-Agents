@@ -545,27 +545,12 @@ const fieldStyle = {
 };
 
 /* ---------------------------------------------------------
-   REAL VOICE PLAYBACK — ElevenLabs via server-side proxy,
-   with browser text-to-speech as a silent fallback if the
-   API call ever fails.
+   REAL VOICE PLAYBACK — pre-generated audio files (Piper neural
+   TTS, generated offline for this seed dataset), served as static
+   assets. No API key, no cloud account, no per-play cost. Browser
+   text-to-speech is a silent fallback for a call that has no
+   pre-generated clip (e.g. any call added later without audio).
 --------------------------------------------------------- */
-const ttsAudioCache = new Map(); // `${callId}:${lineIndex}` -> object URL, persists for the page session
-
-async function fetchLineAudio(callId, idx, text, speaker) {
-  const key = `${callId}:${idx}`;
-  if (ttsAudioCache.has(key)) return ttsAudioCache.get(key);
-  const res = await fetch("/api/tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, speaker }),
-  });
-  if (!res.ok) throw new Error("tts-failed");
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  ttsAudioCache.set(key, url);
-  return url;
-}
-
 function speakWithBrowserFallback(text) {
   return new Promise((resolve) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -582,7 +567,6 @@ function speakWithBrowserFallback(text) {
 function CallRecordingPlayer({ call }) {
   const [playing, setPlaying] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [loadingLine, setLoadingLine] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const cancelledRef = useRef(false);
   const currentAudioRef = useRef(null);
@@ -599,7 +583,6 @@ function CallRecordingPlayer({ call }) {
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setPlaying(false);
     setActiveIndex(-1);
-    setLoadingLine(false);
   };
 
   const playFrom = async (startIdx) => {
@@ -612,23 +595,17 @@ function CallRecordingPlayer({ call }) {
       if (cancelledRef.current) return;
       const line = lines[idx];
       setActiveIndex(idx);
-      const speaker = line.s === "patient" ? "patient" : "agent";
 
-      setLoadingLine(true);
       try {
-        const url = await fetchLineAudio(call.id, idx, line.text, speaker);
-        setLoadingLine(false);
-        if (cancelledRef.current) return;
-        await new Promise((resolve) => {
-          const audio = new Audio(url);
+        await new Promise((resolve, reject) => {
+          const audio = new Audio(`/audio/${call.id}/${idx}.mp3`);
           currentAudioRef.current = audio;
           audio.onended = resolve;
-          audio.onerror = resolve;
-          audio.play().catch(() => resolve());
+          audio.onerror = () => reject(new Error("clip-missing"));
+          audio.play().catch(reject);
         });
       } catch (e) {
-        setLoadingLine(false);
-        setErrorMsg("Live voice unavailable right now — reading with your browser's voice instead.");
+        setErrorMsg("No pre-generated audio for this call — reading with your browser's voice instead.");
         if (!cancelledRef.current) await speakWithBrowserFallback(line.text);
       }
     }
@@ -676,11 +653,9 @@ function CallRecordingPlayer({ call }) {
     </div>
   );
 
-  const statusText = loadingLine
-    ? "Generating voice…"
-    : errorMsg
+  const statusText = errorMsg
     ? errorMsg
-    : "Voice preview — AI-generated speech (ElevenLabs) reading this transcript. Not the original call audio.";
+    : "Voice preview — AI-generated speech reading this transcript. Not the original call audio.";
 
   return (
     <div
