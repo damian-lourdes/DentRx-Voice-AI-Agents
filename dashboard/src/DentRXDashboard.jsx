@@ -545,91 +545,105 @@ const fieldStyle = {
 };
 
 /* ---------------------------------------------------------
-   DUAL WAVEFORM PLAYER (simulated two-way recording)
+   REAL VOICE PLAYBACK — ElevenLabs via server-side proxy,
+   with browser text-to-speech as a silent fallback if the
+   API call ever fails.
 --------------------------------------------------------- */
-/* ---------------------------------------------------------
-   BROWSER TEXT-TO-SPEECH — real, audible call playback
---------------------------------------------------------- */
-function useSpeechVoices() {
-  const [voices, setVoices] = useState([]);
-  useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const load = () => setVoices(window.speechSynthesis.getVoices());
-    load();
-    window.speechSynthesis.onvoiceschanged = load;
-    return () => { window.speechSynthesis.onvoiceschanged = null; };
-  }, []);
-  return voices;
+const ttsAudioCache = new Map(); // `${callId}:${lineIndex}` -> object URL, persists for the page session
+
+async function fetchLineAudio(callId, idx, text, speaker) {
+  const key = `${callId}:${idx}`;
+  if (ttsAudioCache.has(key)) return ttsAudioCache.get(key);
+  const res = await fetch("/api/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, speaker }),
+  });
+  if (!res.ok) throw new Error("tts-failed");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  ttsAudioCache.set(key, url);
+  return url;
+}
+
+function speakWithBrowserFallback(text) {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      resolve();
+      return;
+    }
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.onend = () => resolve();
+    utter.onerror = () => resolve();
+    window.speechSynthesis.speak(utter);
+  });
 }
 
 function CallRecordingPlayer({ call }) {
-  const supported = typeof window !== "undefined" && "speechSynthesis" in window;
-  const voices = useSpeechVoices();
   const [playing, setPlaying] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [loadingLine, setLoadingLine] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const cancelledRef = useRef(false);
+  const currentAudioRef = useRef(null);
 
   const agentWave = useMemo(() => genWave(call.id, 64, "agent"), [call.id]);
   const patientWave = useMemo(() => genWave(call.id, 64, "patient"), [call.id]);
 
-  const enVoices = useMemo(() => voices.filter((v) => v.lang?.startsWith("en")), [voices]);
-  const pool = enVoices.length ? enVoices : voices;
-  const agentVoice = useMemo(
-    () => pool.find((v) => /male|david|alex|daniel|fred|guy/i.test(v.name)) || pool[0] || null,
-    [pool]
-  );
-  const patientVoice = useMemo(() => {
-    const preferred = pool.find((v) => /female|samantha|victoria|karen|zira|susan|aria/i.test(v.name));
-    if (preferred) return preferred;
-    return pool.length > 1 ? pool.find((v) => v !== agentVoice) || pool[1] : pool[0] || null;
-  }, [pool, agentVoice]);
-
   const stopPlayback = () => {
     cancelledRef.current = true;
-    if (supported) window.speechSynthesis.cancel();
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setPlaying(false);
     setActiveIndex(-1);
+    setLoadingLine(false);
   };
 
-  const playFrom = (startIdx) => {
-    if (!supported) return;
-    window.speechSynthesis.cancel();
+  const playFrom = async (startIdx) => {
     cancelledRef.current = false;
     setPlaying(true);
+    setErrorMsg("");
     const lines = call.transcript;
-    const speakNext = (idx) => {
-      if (cancelledRef.current || idx >= lines.length) {
-        setPlaying(false);
-        setActiveIndex(-1);
-        return;
-      }
+
+    for (let idx = startIdx; idx < lines.length; idx++) {
+      if (cancelledRef.current) return;
       const line = lines[idx];
       setActiveIndex(idx);
-      const utter = new SpeechSynthesisUtterance(line.text);
-      utter.lang = "en-US";
-      if (line.s === "agent") {
-        if (agentVoice) utter.voice = agentVoice;
-        utter.pitch = 0.9; utter.rate = 1.03;
-      } else if (line.s === "patient") {
-        if (patientVoice) utter.voice = patientVoice;
-        utter.pitch = 1.15; utter.rate = 1.0;
-      } else {
-        utter.pitch = 1; utter.rate = 0.95; utter.volume = 0.75;
+      const speaker = line.s === "patient" ? "patient" : "agent";
+
+      setLoadingLine(true);
+      try {
+        const url = await fetchLineAudio(call.id, idx, line.text, speaker);
+        setLoadingLine(false);
+        if (cancelledRef.current) return;
+        await new Promise((resolve) => {
+          const audio = new Audio(url);
+          currentAudioRef.current = audio;
+          audio.onended = resolve;
+          audio.onerror = resolve;
+          audio.play().catch(() => resolve());
+        });
+      } catch (e) {
+        setLoadingLine(false);
+        setErrorMsg("Live voice unavailable right now — reading with your browser's voice instead.");
+        if (!cancelledRef.current) await speakWithBrowserFallback(line.text);
       }
-      utter.onend = () => speakNext(idx + 1);
-      utter.onerror = () => { setPlaying(false); setActiveIndex(-1); };
-      window.speechSynthesis.speak(utter);
-    };
-    // small delay avoids a known Chrome bug where speak() right after cancel() is dropped
-    setTimeout(() => speakNext(startIdx), 30);
+    }
+    if (!cancelledRef.current) {
+      setPlaying(false);
+      setActiveIndex(-1);
+    }
   };
 
   useEffect(() => {
     return () => {
       cancelledRef.current = true;
-      if (supported) window.speechSynthesis.cancel();
+      if (currentAudioRef.current) currentAudioRef.current.pause();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const progress = activeIndex >= 0 ? (activeIndex + 1) / call.transcript.length : 0;
@@ -662,6 +676,12 @@ function CallRecordingPlayer({ call }) {
     </div>
   );
 
+  const statusText = loadingLine
+    ? "Generating voice…"
+    : errorMsg
+    ? errorMsg
+    : "Voice preview — AI-generated speech (ElevenLabs) reading this transcript. Not the original call audio.";
+
   return (
     <div
       style={{ border: `1px solid ${COLORS.hairline}`, background: "#FBFBFC" }}
@@ -689,9 +709,8 @@ function CallRecordingPlayer({ call }) {
       <div className="flex items-center gap-3">
         <button
           onClick={() => (playing ? stopPlayback() : playFrom(0))}
-          disabled={!supported}
-          style={{ background: supported ? COLORS.ink : COLORS.hairline }}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 disabled:cursor-not-allowed"
+          style={{ background: COLORS.ink }}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"
         >
           {playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
         </button>
@@ -706,10 +725,8 @@ function CallRecordingPlayer({ call }) {
         </div>
       </div>
 
-      <div className="text-[11px] mt-2" style={{ color: COLORS.sub }}>
-        {supported
-          ? "Voice preview — your browser reads this transcript aloud, distinct voices per speaker. Not the original call audio."
-          : "Voice playback isn't supported in this browser. The transcript below is still fully readable."}
+      <div className="text-[11px] mt-2" style={{ color: errorMsg ? COLORS.warn : COLORS.sub }}>
+        {statusText}
       </div>
 
       <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${COLORS.hairline}` }}>
