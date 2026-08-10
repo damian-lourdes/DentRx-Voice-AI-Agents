@@ -547,39 +547,93 @@ const fieldStyle = {
 /* ---------------------------------------------------------
    DUAL WAVEFORM PLAYER (simulated two-way recording)
 --------------------------------------------------------- */
+/* ---------------------------------------------------------
+   BROWSER TEXT-TO-SPEECH — real, audible call playback
+--------------------------------------------------------- */
+function useSpeechVoices() {
+  const [voices, setVoices] = useState([]);
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const load = () => setVoices(window.speechSynthesis.getVoices());
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
+    return () => { window.speechSynthesis.onvoiceschanged = null; };
+  }, []);
+  return voices;
+}
+
 function CallRecordingPlayer({ call }) {
+  const supported = typeof window !== "undefined" && "speechSynthesis" in window;
+  const voices = useSpeechVoices();
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0); // 0..1
-  const rafRef = useRef(null);
-  const startRef = useRef(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const cancelledRef = useRef(false);
 
   const agentWave = useMemo(() => genWave(call.id, 64, "agent"), [call.id]);
   const patientWave = useMemo(() => genWave(call.id, 64, "patient"), [call.id]);
 
-  useEffect(() => {
-    if (!playing) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      return;
-    }
-    startRef.current = performance.now() - progress * call.duration * 1000;
-    const tick = (now) => {
-      const elapsed = (now - startRef.current) / 1000;
-      const p = Math.min(1, elapsed / call.duration);
-      setProgress(p);
-      if (p >= 1) {
+  const enVoices = useMemo(() => voices.filter((v) => v.lang?.startsWith("en")), [voices]);
+  const pool = enVoices.length ? enVoices : voices;
+  const agentVoice = useMemo(
+    () => pool.find((v) => /male|david|alex|daniel|fred|guy/i.test(v.name)) || pool[0] || null,
+    [pool]
+  );
+  const patientVoice = useMemo(() => {
+    const preferred = pool.find((v) => /female|samantha|victoria|karen|zira|susan|aria/i.test(v.name));
+    if (preferred) return preferred;
+    return pool.length > 1 ? pool.find((v) => v !== agentVoice) || pool[1] : pool[0] || null;
+  }, [pool, agentVoice]);
+
+  const stopPlayback = () => {
+    cancelledRef.current = true;
+    if (supported) window.speechSynthesis.cancel();
+    setPlaying(false);
+    setActiveIndex(-1);
+  };
+
+  const playFrom = (startIdx) => {
+    if (!supported) return;
+    window.speechSynthesis.cancel();
+    cancelledRef.current = false;
+    setPlaying(true);
+    const lines = call.transcript;
+    const speakNext = (idx) => {
+      if (cancelledRef.current || idx >= lines.length) {
         setPlaying(false);
-        setProgress(0);
+        setActiveIndex(-1);
         return;
       }
-      rafRef.current = requestAnimationFrame(tick);
+      const line = lines[idx];
+      setActiveIndex(idx);
+      const utter = new SpeechSynthesisUtterance(line.text);
+      utter.lang = "en-US";
+      if (line.s === "agent") {
+        if (agentVoice) utter.voice = agentVoice;
+        utter.pitch = 0.9; utter.rate = 1.03;
+      } else if (line.s === "patient") {
+        if (patientVoice) utter.voice = patientVoice;
+        utter.pitch = 1.15; utter.rate = 1.0;
+      } else {
+        utter.pitch = 1; utter.rate = 0.95; utter.volume = 0.75;
+      }
+      utter.onend = () => speakNext(idx + 1);
+      utter.onerror = () => { setPlaying(false); setActiveIndex(-1); };
+      window.speechSynthesis.speak(utter);
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => rafRef.current && cancelAnimationFrame(rafRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing]);
+    // small delay avoids a known Chrome bug where speak() right after cancel() is dropped
+    setTimeout(() => speakNext(startIdx), 30);
+  };
 
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+      if (supported) window.speechSynthesis.cancel();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const progress = activeIndex >= 0 ? (activeIndex + 1) / call.transcript.length : 0;
   const currentSec = progress * call.duration;
-  const activeLine = [...call.transcript].reverse().find((l) => l.t <= currentSec) || call.transcript[0];
 
   const Wave = ({ bars, color, label, icon }) => (
     <div className="flex items-center gap-2">
@@ -616,7 +670,7 @@ function CallRecordingPlayer({ call }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 text-xs font-mono" style={{ color: COLORS.sub }}>
           <Mic size={13} />
-          TWO-WAY RECORDING · SIMULATED PLAYBACK
+          TWO-WAY RECORDING · VOICE PLAYBACK
         </div>
         <button
           className="flex items-center gap-1 text-xs font-medium"
@@ -634,9 +688,10 @@ function CallRecordingPlayer({ call }) {
 
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setPlaying((p) => !p)}
-          style={{ background: COLORS.ink }}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"
+          onClick={() => (playing ? stopPlayback() : playFrom(0))}
+          disabled={!supported}
+          style={{ background: supported ? COLORS.ink : COLORS.hairline }}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 disabled:cursor-not-allowed"
         >
           {playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
         </button>
@@ -651,11 +706,17 @@ function CallRecordingPlayer({ call }) {
         </div>
       </div>
 
+      <div className="text-[11px] mt-2" style={{ color: COLORS.sub }}>
+        {supported
+          ? "Voice preview — your browser reads this transcript aloud, distinct voices per speaker. Not the original call audio."
+          : "Voice playback isn't supported in this browser. The transcript below is still fully readable."}
+      </div>
+
       <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${COLORS.hairline}` }}>
         <div className="text-xs font-mono mb-2" style={{ color: COLORS.sub }}>TRANSCRIPT</div>
         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
           {call.transcript.map((line, i) => {
-            const isActive = playing && line === activeLine;
+            const isActive = playing && i === activeIndex;
             const isSystem = line.s === "system";
             return (
               <div
