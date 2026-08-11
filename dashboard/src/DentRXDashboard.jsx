@@ -591,22 +591,29 @@ function CallRecordingPlayer({ call }) {
     setErrorMsg("");
     const lines = call.transcript;
 
+    const playAudioFile = (src) =>
+      new Promise((resolve, reject) => {
+        const audio = new Audio(src);
+        currentAudioRef.current = audio;
+        audio.onended = resolve;
+        audio.onerror = () => reject(new Error("clip-missing"));
+        audio.play().catch(reject);
+      });
+
     for (let idx = startIdx; idx < lines.length; idx++) {
       if (cancelledRef.current) return;
       const line = lines[idx];
       setActiveIndex(idx);
 
       try {
-        await new Promise((resolve, reject) => {
-          const audio = new Audio(`/audio/${call.id}/${idx}.mp3`);
-          currentAudioRef.current = audio;
-          audio.onended = resolve;
-          audio.onerror = () => reject(new Error("clip-missing"));
-          audio.play().catch(reject);
-        });
-      } catch (e) {
-        setErrorMsg("No pre-generated audio for this call — reading with your browser's voice instead.");
-        if (!cancelledRef.current) await speakWithBrowserFallback(line.text);
+        await playAudioFile(`/audio/${call.id}/${idx}.mp3`);
+      } catch (e1) {
+        try {
+          await playAudioFile(`/audio/${call.id}/${idx}.wav`);
+        } catch (e2) {
+          setErrorMsg("No pre-generated audio for this call — reading with your browser's voice instead.");
+          if (!cancelledRef.current) await speakWithBrowserFallback(line.text);
+        }
       }
     }
     if (!cancelledRef.current) {

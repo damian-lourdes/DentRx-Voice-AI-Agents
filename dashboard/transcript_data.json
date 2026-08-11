@@ -1,0 +1,448 @@
+[
+  [
+    "C-10231",
+    [
+      [
+        "agent",
+        "Thanks for calling Riverside Dental, this is the scheduling assistant. Can I get your name?"
+      ],
+      [
+        "patient",
+        "Hi, it's Maria Gonzalez. I need to book a cleaning."
+      ],
+      [
+        "agent",
+        "Happy to help, Maria. Best callback number, is it this one ending 0148?"
+      ],
+      [
+        "patient",
+        "Yes that's right."
+      ],
+      [
+        "agent",
+        "What date were you hoping for?"
+      ],
+      [
+        "patient",
+        "Sometime next Tuesday if possible."
+      ],
+      [
+        "agent",
+        "Tuesday the 11th, Dr. Patel has 9:15am or 2:40pm open."
+      ],
+      [
+        "patient",
+        "2:40 works better for me."
+      ],
+      [
+        "agent",
+        "Booked for Tuesday, Aug 11 at 2:40pm with Dr. Patel. I'll text a confirmation now."
+      ],
+      [
+        "patient",
+        "Perfect, thank you!"
+      ]
+    ]
+  ],
+  [
+    "C-10232",
+    [
+      [
+        "agent",
+        "Riverside Dental scheduling assistant, how can I help?"
+      ],
+      [
+        "patient",
+        "I need to cancel my appointment tomorrow."
+      ],
+      [
+        "agent",
+        "Sure, can I get your name and phone number?"
+      ],
+      [
+        "patient",
+        "James Okafor, 860 555 0177."
+      ],
+      [
+        "agent",
+        "I see a cleaning with Dr. Lin tomorrow at 10:30am. Is that the one?"
+      ],
+      [
+        "patient",
+        "Yes, that's it."
+      ],
+      [
+        "agent",
+        "Cancelled. Want me to look at rebooking, or should I just send the cancellation confirmation?"
+      ],
+      [
+        "patient",
+        "Just cancel for now, I'll call back."
+      ],
+      [
+        "agent",
+        "Done, confirmation is on its way by text."
+      ]
+    ]
+  ],
+  [
+    "C-10233",
+    [
+      [
+        "agent",
+        "Riverside Dental assistant, how can I help today?"
+      ],
+      [
+        "patient",
+        "I wanted to check if my insurance claim went through for my last visit."
+      ],
+      [
+        "agent",
+        "I can check that. Name, phone, and insurance member ID please."
+      ],
+      [
+        "patient",
+        "Priya Ramaswami, 860 555 0193, member ID PR central 44821."
+      ],
+      [
+        "agent",
+        "One moment... your claim for the July 22nd visit was processed and paid by Delta Dental."
+      ],
+      [
+        "patient",
+        "Great, do I still owe anything?"
+      ],
+      [
+        "agent",
+        "Yes, there's a patient responsibility balance of $42.00 after insurance."
+      ],
+      [
+        "patient",
+        "Can you text me a way to pay that?"
+      ],
+      [
+        "agent",
+        "Sending a secure payment link to your phone now."
+      ]
+    ]
+  ],
+  [
+    "C-10234",
+    [
+      [
+        "agent",
+        "Riverside Dental assistant, how can I help?"
+      ],
+      [
+        "patient",
+        "My son fell and his tooth is bleeding a lot, what do I do?"
+      ],
+      [
+        "agent",
+        "I understand, this sounds urgent. I'm connecting you to our on-call dentist right now, please stay on the line."
+      ],
+      [
+        "system",
+        "Call transferred to on-call staff (Dr. Patel)."
+      ]
+    ]
+  ],
+  [
+    "C-10235",
+    [
+      [
+        "agent",
+        "Hi, this is a reminder call from Riverside Dental for Robert Fields."
+      ],
+      [
+        "patient",
+        "Yes speaking."
+      ],
+      [
+        "agent",
+        "You have a cleaning with Dr. Lin tomorrow at 3:00pm. Will you be able to make it?"
+      ],
+      [
+        "patient",
+        "Yes I'll be there."
+      ],
+      [
+        "agent",
+        "Great, see you then. Reply to the text if anything changes."
+      ]
+    ]
+  ],
+  [
+    "C-10236",
+    [
+      [
+        "agent",
+        "Thanks for calling Riverside Dental, are you an existing patient with us?"
+      ],
+      [
+        "patient",
+        "No, first time. I just moved to the area."
+      ],
+      [
+        "agent",
+        "Welcome. Let's get you set up - can I get your full name and date of birth?"
+      ],
+      [
+        "patient",
+        "Angela Brooks, March 4th 1991."
+      ],
+      [
+        "agent",
+        "And do you have dental insurance you'd like on file?"
+      ],
+      [
+        "patient",
+        "Yes, Cigna."
+      ],
+      [
+        "agent",
+        "I've pre-registered you. I'll text a link for your new patient forms. What brings you in?"
+      ],
+      [
+        "patient",
+        "Just a general checkup and cleaning."
+      ],
+      [
+        "agent",
+        "Dr. Patel has Thursday at 11am or Friday at 1:30pm."
+      ],
+      [
+        "patient",
+        "Friday works."
+      ],
+      [
+        "agent",
+        "Booked for Friday at 1:30pm. Forms link is on its way."
+      ]
+    ]
+  ],
+  [
+    "C-10237",
+    [
+      [
+        "agent",
+        "Riverside Dental assistant, how can I help?"
+      ],
+      [
+        "patient",
+        "Do you guys take MetLife?"
+      ],
+      [
+        "agent",
+        "Yes, we're in-network with MetLife, Delta Dental, and Cigna."
+      ],
+      [
+        "patient",
+        "Great, and what are your hours on Saturday?"
+      ],
+      [
+        "agent",
+        "We're open Saturdays 9am to 1pm."
+      ],
+      [
+        "patient",
+        "Perfect, thanks."
+      ]
+    ]
+  ],
+  [
+    "C-10238",
+    [
+      [
+        "agent",
+        "Riverside Dental assistant, how can I help?"
+      ],
+      [
+        "patient",
+        "I had a extraction Tuesday and the pain medication isn't lasting, can I get a refill?"
+      ],
+      [
+        "agent",
+        "I can't approve medication changes, but I'll pass this to Dr. Lin's clinical team right away with your details."
+      ],
+      [
+        "patient",
+        "Okay, how soon will someone call back?"
+      ],
+      [
+        "agent",
+        "Typically within the hour. I've flagged it as priority given the post-op context."
+      ]
+    ]
+  ],
+  [
+    "C-10239",
+    [
+      [
+        "agent",
+        "Riverside Dental assistant, how can I help?"
+      ],
+      [
+        "patient",
+        "I need a checkup, is anything open this Thursday?"
+      ],
+      [
+        "agent",
+        "Thursday is fully booked with Dr. Lin. The next opening is Monday the 17th."
+      ],
+      [
+        "patient",
+        "Hmm, nothing sooner at all?"
+      ],
+      [
+        "agent",
+        "There's a cancellation slot next Friday the 14th at 8am if that works."
+      ],
+      [
+        "patient",
+        "Yes, I'll take that."
+      ],
+      [
+        "agent",
+        "Booked for Friday, Aug 14 at 8:00am. Confirmation text is on its way."
+      ]
+    ]
+  ],
+  [
+    "C-10240",
+    [
+      [
+        "agent",
+        "Hi, this is Riverside Dental calling about an outstanding balance for Sarah Nguyen."
+      ],
+      [
+        "patient",
+        "Oh right, how much is it?"
+      ],
+      [
+        "agent",
+        "$68.00 remaining after insurance from your June 3rd visit."
+      ],
+      [
+        "patient",
+        "Can you text me a link to pay it?"
+      ],
+      [
+        "agent",
+        "Sending that now, thanks for confirming."
+      ]
+    ]
+  ],
+  [
+    "C-10241",
+    [
+      [
+        "agent",
+        "Thanks for calling Riverside Dental, this is the scheduling assistant. How can I help?"
+      ],
+      [
+        "patient",
+        "Hey, I chipped a tooth and want to get it looked at."
+      ],
+      [
+        "agent",
+        "Sorry to hear that. Can I get your name and a callback number?"
+      ],
+      [
+        "patient",
+        "Marcus Bell, 860 555 0812."
+      ],
+      [
+        "agent",
+        "Dr. Patel has an opening tomorrow at 9:40am, or Thursday at 4:00pm."
+      ],
+      [
+        "patient",
+        "Tomorrow morning works."
+      ],
+      [
+        "agent",
+        "Booked for tomorrow, Aug 11 at 9:40am with Dr. Patel. Confirmation text on its way."
+      ]
+    ]
+  ],
+  [
+    "C-10242",
+    [
+      [
+        "agent",
+        "Hi, this is a reminder call from Riverside Dental for Grace Kim."
+      ],
+      [
+        "patient",
+        "Yes, that's me."
+      ],
+      [
+        "agent",
+        "You have a checkup with Dr. Lin this Friday at 8:30am. Will that still work?"
+      ],
+      [
+        "patient",
+        "Yes, I'll be there."
+      ],
+      [
+        "agent",
+        "Great, see you then."
+      ]
+    ]
+  ],
+  [
+    "C-10243",
+    [
+      [
+        "agent",
+        "Riverside Dental assistant, how can I help today?"
+      ],
+      [
+        "patient",
+        "I'm trying to find out about a claim from a couple weeks ago."
+      ],
+      [
+        "agent",
+        "I can check that. Name, phone, and insurance member ID please."
+      ],
+      [
+        "patient",
+        "David Alonso, 860 555 0429, member ID JO 11029."
+      ],
+      [
+        "agent",
+        "One moment... that claim is still in process with your insurer, no balance is due yet."
+      ],
+      [
+        "patient",
+        "Okay, how long does that usually take?"
+      ],
+      [
+        "agent",
+        "Typically 2 to 3 weeks. I'll text you a summary for your records."
+      ]
+    ]
+  ],
+  [
+    "C-10244",
+    [
+      [
+        "agent",
+        "Riverside Dental assistant, how can I help?"
+      ],
+      [
+        "patient",
+        "What's your address?"
+      ],
+      [
+        "agent",
+        "We're at 142 Riverside Ave, West Hartford. Anything else?"
+      ],
+      [
+        "patient",
+        "Nope, that's all, thanks."
+      ]
+    ]
+  ]
+]
