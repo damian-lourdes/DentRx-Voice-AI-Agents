@@ -1,9 +1,10 @@
 // /api/agent-action.js
-// Called two ways:
-//  1) By Vapi during a live call, as a tool-call webhook:
-//     { "message": { "toolCalls": [ { "id": "...", "function": { "name": "book_appointment", "arguments": {...} } } ] } }
-//     Must respond: { "results": [ { "toolCallId": "...", "result": "<string>" } ] }
-//  2) Directly via curl for testing: { "action": "book_appointment", "args": {...} }
+// Supports three request shapes:
+//  1) Vapi "API Request" tool (flat body): { "action": "book_appointment", "patient": "...", "phone": "...", ... }
+//     Responds: { "result": "<string>" }
+//  2) Vapi "Function" tool webhook: { "message": { "toolCalls": [ { "id": "...", "function": { "name": "...", "arguments": {...} } } ] } }
+//     Responds: { "results": [ { "toolCallId": "...", "result": "<string>" } ] }
+//  3) Direct curl testing: { "action": "book_appointment", "args": {...} }
 //     Responds: { "result": "<string>" }
 //
 // NOTE ON TRIAL SMS: Twilio trial accounts can only send one of a fixed set
@@ -144,8 +145,10 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
   try {
-    // Vapi live-call format
-    const toolCalls = req.body?.message?.toolCalls;
+    const body = req.body || {};
+
+    // Shape 2: Vapi "Function" tool webhook
+    const toolCalls = body.message?.toolCalls;
     if (Array.isArray(toolCalls)) {
       const results = [];
       for (const call of toolCalls) {
@@ -168,12 +171,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ results });
     }
 
-    // Simple curl-testing format
-    const { action, args = {} } = req.body || {};
+    // Shape 1 (Vapi API Request tool, flat body) and Shape 3 (curl testing, nested args)
+    const { action, args } = body;
     const handlerFn = ACTIONS[action];
     if (!handlerFn) return res.status(400).json({ error: `Unknown action: ${action}` });
 
-    const result = await handlerFn(args);
+    // If "args" is present and is an object, use it (shape 3). Otherwise treat every
+    // other top-level key as the args (shape 1 - Vapi's flat API Request body).
+    const finalArgs = args && typeof args === "object"
+      ? args
+      : Object.fromEntries(Object.entries(body).filter(([k]) => k !== "action"));
+
+    const result = await handlerFn(finalArgs);
     return res.status(200).json({ result });
   } catch (err) {
     console.error(err);
