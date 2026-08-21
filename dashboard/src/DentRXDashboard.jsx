@@ -8,6 +8,54 @@ import {
   Mail, Lock, Eye, EyeOff, LogOut
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
+import { createClient } from "@supabase/supabase-js";
+
+/* ---------------------------------------------------------
+   LIVE DATA — Supabase client + row mapping
+   Falls back to seed data below if env vars are missing or
+   a fetch fails/returns nothing, so the demo never breaks.
+--------------------------------------------------------- */
+const supabase =
+  typeof import.meta !== "undefined" &&
+  import.meta.env?.VITE_SUPABASE_URL &&
+  import.meta.env?.VITE_SUPABASE_ANON_KEY
+    ? createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
+    : null;
+
+function mapCallRow(r) {
+  const tag = /fail|no claim|not found/i.test(r.outcome || "")
+    ? "danger"
+    : /book|confirm|provided|cancel/i.test(r.outcome || "")
+    ? "success"
+    : "warn";
+  return {
+    id: r.id,
+    patient: r.patient,
+    phone: r.phone,
+    direction: r.direction,
+    intent: r.intent,
+    provider: r.provider,
+    time: r.created_at,
+    duration: r.duration,
+    outcome: r.outcome,
+    resolvedBy: r.resolved_by,
+    tag,
+    transcript: r.transcript || [],
+  };
+}
+
+function mapMessageRow(r) {
+  return {
+    id: r.id,
+    patient: r.patient,
+    phone: r.phone,
+    type: r.type,
+    time: r.created_at,
+    status: r.status,
+    relatedCall: r.related_call,
+    body: r.body,
+  };
+}
 
 /* ---------------------------------------------------------
    TOKENS
@@ -70,7 +118,7 @@ function genWave(id, n, lane) {
 /* ---------------------------------------------------------
    SEED DATA
 --------------------------------------------------------- */
-const CALLS = [
+const SEED_CALLS = [
   {
     id: "C-10231",
     patient: "Maria Gonzalez",
@@ -377,7 +425,7 @@ const CALLS = [
   },
 ];
 
-const APPOINTMENTS = [
+const SEED_APPOINTMENTS = [
   { id: "A-501", patient: "Maria Gonzalez", provider: "Dr. Patel", date: "2026-08-11", time: "2:40 PM", type: "Cleaning", status: "Confirmed", source: "AI" },
   { id: "A-502", patient: "Angela Brooks", provider: "Dr. Patel", date: "2026-08-14", time: "1:30 PM", type: "New patient exam", status: "Confirmed", source: "AI" },
   { id: "A-503", patient: "Robert Fields", provider: "Dr. Lin", date: "2026-08-13", time: "3:00 PM", type: "Cleaning", status: "Confirmed", source: "AI" },
@@ -399,7 +447,7 @@ const PROVIDER_COLORS = {
   "Dr. Lin": { fg: "#2E7DB8", bg: "#E7F1FA" },
 };
 
-const MESSAGES = [
+const SEED_MESSAGES = [
   {
     id: "M-1", patient: "Maria Gonzalez", phone: "(860) 555-0148", type: "Booking confirmation",
     time: "2026-08-10T08:13:00", status: "Read", relatedCall: "C-10231",
@@ -881,7 +929,7 @@ function BentoStat({ label, icon, value, caption, sub }) {
 /* ---------------------------------------------------------
    PAGES
 --------------------------------------------------------- */
-function OverviewPage({ onNavigate }) {
+function OverviewPage({ onNavigate, calls: CALLS, appointments: APPOINTMENTS, messages: MESSAGES }) {
   const intentData = useMemo(() => {
     const counts = {};
     CALLS.forEach((c) => { counts[c.intent] = (counts[c.intent] || 0) + 1; });
@@ -1107,7 +1155,7 @@ function OverviewPage({ onNavigate }) {
   );
 }
 
-function CallLogsPage({ focusCallId, focusNonce }) {
+function CallLogsPage({ focusCallId, focusNonce, calls: CALLS }) {
   const [expandedId, setExpandedId] = useState("C-10233");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -1185,7 +1233,7 @@ function MessageStatus({ status }) {
   return <span className="flex items-center gap-1 text-xs font-medium" style={{ color: COLORS.danger }}><XCircle size={13} /> Failed</span>;
 }
 
-function MessagesPage({ onViewCall }) {
+function MessagesPage({ onViewCall, messages: MESSAGES }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
   const sorted = [...MESSAGES].sort((a, b) => new Date(b.time) - new Date(a.time));
@@ -1370,8 +1418,8 @@ function AddAppointmentModal({ onClose, onAdd }) {
   );
 }
 
-function CalendarPage() {
-  const [appointments, setAppointments] = useState(APPOINTMENTS);
+function CalendarPage({ initialAppointments }) {
+  const [appointments, setAppointments] = useState(initialAppointments);
   const [blocked, setBlocked] = useState(new Set()); // keys "date|hour"
   const [showAdd, setShowAdd] = useState(false);
   const hours = [];
@@ -1524,7 +1572,7 @@ function CalendarPage() {
   );
 }
 
-function ExceptionsPage() {
+function ExceptionsPage({ calls: CALLS }) {
   const exceptions = CALLS.filter((c) => c.resolvedBy === "Human");
   return (
     <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.hairline}` }} className="rounded-2xl p-5">
@@ -1784,6 +1832,34 @@ export default function DentRXDashboard() {
   const [focusCallId, setFocusCallId] = useState(null);
   const [focusNonce, setFocusNonce] = useState(0);
 
+  const [calls, setCalls] = useState(SEED_CALLS);
+  const [appointments, setAppointments] = useState(SEED_APPOINTMENTS);
+  const [messages, setMessages] = useState(SEED_MESSAGES);
+  const [dataSource, setDataSource] = useState("demo"); // "demo" | "live"
+
+  useEffect(() => {
+    if (!supabase) return; // no Supabase env vars configured — stay on seed data
+    let cancelled = false;
+    (async () => {
+      try {
+        const [callsRes, apptRes, msgRes] = await Promise.all([
+          supabase.from("calls").select("*").order("created_at", { ascending: false }),
+          supabase.from("appointments").select("*").order("date", { ascending: true }),
+          supabase.from("messages").select("*").order("created_at", { ascending: false }),
+        ]);
+        if (cancelled) return;
+        let gotLiveData = false;
+        if (callsRes.data?.length) { setCalls(callsRes.data.map(mapCallRow)); gotLiveData = true; }
+        if (apptRes.data?.length) { setAppointments(apptRes.data); gotLiveData = true; }
+        if (msgRes.data?.length) { setMessages(msgRes.data.map(mapMessageRow)); gotLiveData = true; }
+        if (gotLiveData) setDataSource("live");
+      } catch (e) {
+        console.error("Supabase fetch failed, staying on seed data:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const viewCall = (callId) => {
     setTab("calls");
     setFocusCallId(callId);
@@ -1844,7 +1920,7 @@ export default function DentRXDashboard() {
                   {n.label}
                   {n.key === "exceptions" && (
                     <span style={{ background: COLORS.danger }} className="ml-auto text-white text-[10px] font-semibold rounded-full w-5 h-5 flex items-center justify-center">
-                      {CALLS.filter((c) => c.resolvedBy === "Human").length}
+                      {calls.filter((c) => c.resolvedBy === "Human").length}
                     </span>
                   )}
                 </button>
@@ -1867,10 +1943,22 @@ export default function DentRXDashboard() {
         <div className="flex-1 min-w-0">
           <div style={{ background: COLORS.surface, borderBottom: `1px solid ${COLORS.hairline}` }} className="px-6 py-4 flex items-center justify-between">
             <div>
-              <div style={{ fontFamily: "'Space Grotesk', sans-serif" }} className="text-xl font-semibold" >
+              <div style={{ fontFamily: "'Space Grotesk', sans-serif" }} className="text-xl font-semibold flex items-center gap-2">
                 {NAV.find((n) => n.key === tab)?.label}
+                <span
+                  title={dataSource === "live" ? "Showing live data from Supabase" : "Showing demo data — no live calls yet"}
+                  style={{
+                    background: dataSource === "live" ? COLORS.successSoft : COLORS.hairline,
+                    color: dataSource === "live" ? COLORS.success : COLORS.sub,
+                  }}
+                  className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                >
+                  {dataSource === "live" ? "Live" : "Demo data"}
+                </span>
               </div>
-              <div className="text-xs" style={{ color: COLORS.sub }}>Monday, August 10 2026</div>
+              <div className="text-xs" style={{ color: COLORS.sub }}>
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <button className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.hairline}`, color: COLORS.ink }}>
@@ -1889,11 +1977,11 @@ export default function DentRXDashboard() {
           </div>
 
           <div className="p-6">
-            {tab === "overview" && <OverviewPage onNavigate={setTab} />}
-            {tab === "calls" && <CallLogsPage focusCallId={focusCallId} focusNonce={focusNonce} />}
-            {tab === "messages" && <MessagesPage onViewCall={viewCall} />}
-            {tab === "calendar" && <CalendarPage />}
-            {tab === "exceptions" && <ExceptionsPage />}
+            {tab === "overview" && <OverviewPage onNavigate={setTab} calls={calls} appointments={appointments} messages={messages} />}
+            {tab === "calls" && <CallLogsPage focusCallId={focusCallId} focusNonce={focusNonce} calls={calls} />}
+            {tab === "messages" && <MessagesPage onViewCall={viewCall} messages={messages} />}
+            {tab === "calendar" && <CalendarPage initialAppointments={appointments} />}
+            {tab === "exceptions" && <ExceptionsPage calls={calls} />}
           </div>
         </div>
       </div>
