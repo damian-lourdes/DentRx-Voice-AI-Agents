@@ -30,7 +30,7 @@ OUT_DIR = os.path.join(os.getcwd(), "public", "audio")
 VOICE_ID = {
     "agent": "82a76fb8-3524-4e87-9265-9795c8e4ede6",
     "system": "82a76fb8-3524-4e87-9265-9795c8e4ede6",
-    "patient": "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c",
+    "patient": "5bbc32c1-a1f6-44e8-bedb-9870f23619e2",
 }
 
 API_URL = "https://api.hume.ai/v0/tts"
