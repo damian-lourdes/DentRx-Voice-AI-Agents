@@ -6,13 +6,6 @@
 //     Responds: { "results": [ { "toolCallId": "...", "result": "<string>" } ] }
 //  3) Direct curl testing: { "action": "book_appointment", "args": {...} }
 //     Responds: { "result": "<string>" }
-//
-// NOTE ON TRIAL SMS: Twilio trial accounts can only send one of a fixed set
-// of template names as the message `body` (no custom text). We send the
-// required template name to Twilio so the SMS actually goes through, but we
-// still store the real, personalized message text in Supabase - that's what
-// the dashboard displays. Once Twilio billing is added, swap
-// `sendSms(to, templateName)` calls below to pass `smsBody` instead.
 
 import { createClient } from "@supabase/supabase-js";
 import twilio from "twilio";
@@ -29,18 +22,17 @@ const twilioClient = twilio(
 
 const FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
 
-const TRIAL_TEMPLATES = {
-  appointment: "sms_appointment_reminders",
-  billing: "sms_account_alerts",
-};
-
 function newId(prefix) {
   return `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
-async function sendSms(to, templateName) {
+function logIfError(label, { error }) {
+  if (error) console.error(`Supabase ${label} failed:`, error.message, error.details || "");
+}
+
+async function sendSms(to, body) {
   try {
-    await twilioClient.messages.create({ to, from: FROM_NUMBER, body: templateName });
+    await twilioClient.messages.create({ to, from: FROM_NUMBER, body });
     return "Delivered";
   } catch (err) {
     console.error("SMS send failed:", err.message);
@@ -58,22 +50,22 @@ async function bookAppointment(args) {
   const apptId = newId("A");
   const callId = newId("C");
 
-  await supabase.from("appointments").insert({
+  logIfError("appointments insert", await supabase.from("appointments").insert({
     id: apptId, patient, provider, date, time, type, status: "Confirmed", source: "AI",
-  });
+  }));
 
-  await supabase.from("calls").insert({
+  logIfError("calls insert", await supabase.from("calls").insert({
     id: callId, patient, phone, direction: "inbound", intent: "Book appointment",
     provider, duration: 0, outcome: "Booked", resolved_by: "AI",
     transcript: [{ s: "system", t: 0, text: `Booked ${type} with ${provider} on ${date} at ${time}.` }],
-  });
+  }));
 
   const smsBody = `Hi ${patient}, your ${type} with ${provider} is confirmed for ${date} at ${time}. Reply to this text if you need to reschedule.`;
   const smsStatus = await sendSms(phone, TRIAL_TEMPLATES.appointment);
-  await supabase.from("messages").insert({
+  logIfError("messages insert", await supabase.from("messages").insert({
     id: newId("M"), patient, phone, type: "Booking confirmation",
     body: smsBody, status: smsStatus, related_call: callId,
-  });
+  }));
 
   return `Booked ${type} with ${provider} on ${date} at ${time}.`;
 }
@@ -89,21 +81,21 @@ async function cancelAppointment(args) {
   }
 
   const appt = appts[0];
-  await supabase.from("appointments").update({ status: "Cancelled" }).eq("id", appt.id);
+  logIfError("appointments update", await supabase.from("appointments").update({ status: "Cancelled" }).eq("id", appt.id));
 
   const callId = newId("C");
-  await supabase.from("calls").insert({
+  logIfError("calls insert", await supabase.from("calls").insert({
     id: callId, patient, phone, direction: "inbound", intent: "Cancel appointment",
     provider: appt.provider, duration: 0, outcome: "Cancelled", resolved_by: "AI",
     transcript: [{ s: "system", t: 0, text: `Cancelled ${appt.type} with ${appt.provider} on ${appt.date}.` }],
-  });
+  }));
 
   const smsBody = `Hi ${patient}, your appointment on ${appt.date} at ${appt.time} has been cancelled. Call us anytime to rebook.`;
   const smsStatus = await sendSms(phone, TRIAL_TEMPLATES.appointment);
-  await supabase.from("messages").insert({
+  logIfError("messages insert", await supabase.from("messages").insert({
     id: newId("M"), patient, phone, type: "Cancellation confirmation",
     body: smsBody, status: smsStatus, related_call: callId,
-  });
+  }));
 
   return `Cancelled the ${appt.type} on ${appt.date} at ${appt.time}.`;
 }
@@ -117,19 +109,19 @@ async function checkClaimStatus(args) {
     ? `Claim status: ${claim.status}.${claim.balance ? ` Balance after insurance: $${claim.balance.toFixed(2)}.` : ""}`
     : "No claim found for that insurance ID.";
 
-  await supabase.from("calls").insert({
+  logIfError("calls insert", await supabase.from("calls").insert({
     id: callId, patient, phone, direction: "inbound", intent: "Insurance / billing",
     provider: "-", duration: 0, outcome: claim ? "Claim status provided" : "No claim found", resolved_by: "AI",
     transcript: [{ s: "system", t: 0, text: resultText }],
-  });
+  }));
 
   if (claim && claim.balance) {
     const smsBody = `Hi ${patient}, you have a balance of $${claim.balance.toFixed(2)} after insurance. Pay securely: [demo payment link]`;
     const smsStatus = await sendSms(phone, TRIAL_TEMPLATES.billing);
-    await supabase.from("messages").insert({
+    logIfError("messages insert", await supabase.from("messages").insert({
       id: newId("M"), patient, phone, type: "Payment link",
       body: smsBody, status: smsStatus, related_call: callId,
-    });
+    }));
   }
 
   return resultText;
@@ -146,6 +138,7 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
+    console.log("INCOMING BODY:", JSON.stringify(body));
 
     // Shape 2: Vapi "Function" tool webhook
     const toolCalls = body.message?.toolCalls;
