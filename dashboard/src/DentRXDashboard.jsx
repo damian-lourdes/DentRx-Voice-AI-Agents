@@ -1843,9 +1843,9 @@ export default function DentRXDashboard() {
     (async () => {
       try {
         const [callsRes, apptRes, msgRes] = await Promise.all([
-          supabase.from("calls").select("*").order("created_at", { ascending: false }),
+          supabase.from("calls").select("*").order("created_at", { ascending: false, nullsFirst: false }),
           supabase.from("appointments").select("*").order("date", { ascending: true }),
-          supabase.from("messages").select("*").order("created_at", { ascending: false }),
+          supabase.from("messages").select("*").order("created_at", { ascending: false, nullsFirst: false }),
         ]);
         if (cancelled) return;
         let gotLiveData = false;
