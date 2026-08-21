@@ -782,7 +782,7 @@ function CallRecordingPlayer({ call }) {
                   {!isSystem ? (
                     <>
                       <span className="font-medium" style={{ color: COLORS.ink }}>
-                        {line.s === "agent" ? "AI Agent" : call.patient.split(" ")[0]}:{" "}
+                        {line.s === "agent" ? "AI Agent" : (call.patient || "Patient").split(" ")[0]}:{" "}
                       </span>
                       <span style={{ color: COLORS.sub }}>{line.text}</span>
                     </>
@@ -970,7 +970,7 @@ function OverviewPage({ onNavigate, calls: CALLS, appointments: APPOINTMENTS, me
     }, 0);
 
   const recentInitials = CALLS.slice(0, 5).map((c) =>
-    c.patient.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+    (c.patient || "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
   );
 
   return (
@@ -1547,7 +1547,8 @@ function CalendarPage({ initialAppointments }) {
         </div>
         <div className="space-y-2">
           {[...appointments]
-            .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+            .sort((a, b) => ((a.date || "") + (a.time || "")).localeCompare((b.date || "") + (b.time || ""))
+            )
             .map((a) => (
               <div key={a.id} className="flex items-center gap-4 py-3 text-sm" style={{ borderBottom: `1px solid ${COLORS.hairline}` }}>
                 <div className="w-24 font-mono text-xs" style={{ color: COLORS.sub }}>{a.date}</div>
