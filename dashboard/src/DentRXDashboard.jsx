@@ -1359,7 +1359,24 @@ function parseTimeToHours(timeStr) {
   return h + m / 60;
 }
 
-const CAL_DAYS = ["2026-08-08", "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14"];
+function getCurrentBusinessWeek() {
+  // Reproduces the same Sat + Mon-Fri (closed Sunday) week shape as before,
+  // but anchored to today's real date instead of a fixed hardcoded week.
+  const today = new Date();
+  const dow = today.getDay(); // 0=Sun ... 6=Sat
+  const daysSinceSat = (dow + 1) % 7;
+  const sat = new Date(today);
+  sat.setDate(today.getDate() - daysSinceSat);
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const days = [fmt(sat)];
+  for (let i = 2; i <= 6; i++) { // Mon(2) .. Fri(6), skipping Sunday(1)
+    const d = new Date(sat);
+    d.setDate(sat.getDate() + i);
+    days.push(fmt(d));
+  }
+  return days;
+}
+const CAL_DAYS = getCurrentBusinessWeek();
 const CAL_START_HOUR = 8;
 const CAL_END_HOUR = 17;
 const ROW_H = 52;
